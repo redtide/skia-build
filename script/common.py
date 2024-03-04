@@ -10,6 +10,7 @@ def create_parser(version_required=False):
   parser.add_argument('--system')
   parser.add_argument('--machine')
   parser.add_argument('--ndk')
+  parser.add_argument('--repo_slug')
   return parser
 
 def system():
@@ -25,7 +26,7 @@ def machine():
 def version():
   parser = create_parser()
   args = parser.parse_args()
-  
+
   if args.version:
     return args.version
 
@@ -44,7 +45,7 @@ def classifier():
   parser = create_parser()
   (args, _) = parser.parse_known_args()
   return '-' + args.classifier if args.classifier else ''
-  
+
 def github_headers():
   if os.environ.get('GITHUB_BASIC'):
     auth = 'Basic ' + base64.b64encode(os.environ.get('GITHUB_BASIC').encode('utf-8')).decode('utf-8')
@@ -60,3 +61,7 @@ def ndk():
   (args, _) = parser.parse_known_args()
   return args.ndk if args.ndk else ''
 
+def repo_slug():
+  parser = create_parser()
+  (args, _) = parser.parse_known_args()
+  return args.repo_slug if args.repo_slug else ''

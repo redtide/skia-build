@@ -12,11 +12,11 @@ def parents(path):
 
 def main():
   os.chdir(os.path.join(os.path.dirname(__file__), os.pardir, 'skia'))
-  
+
   build_type = common.build_type()
-  version = common.version()
-  machine = common.machine()
-  system = common.system()
+  version    = common.version()
+  machine    = common.machine()
+  system     = common.system()
   classifier = common.classifier()
 
   globs = [
@@ -69,8 +69,8 @@ def main():
   ]
 
   target = 'Skia-' + version + '-' + system + '-' + build_type + '-' + machine + classifier + '.zip'
-  print('> Writing', target)
-  
+  print('Creating', target)
+
   with zipfile.ZipFile(os.path.join(os.pardir, target), 'w', compression=zipfile.ZIP_DEFLATED) as zip:
     dirs = set()
     for glob in globs:
