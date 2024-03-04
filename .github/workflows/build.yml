@@ -1,149 +1,297 @@
-on:
-  push:
-    branches:
-      - master
-    paths:
-      - ".github/workflows/*"
-      - "script/*"
-      - "patches/*"
-  workflow_dispatch:
-    inputs:
-      skip_release:
-        description: 'Skip release related steps? (true/false)'
-        required: true
-        default: 'false'
-
-env:
-  version: m93-87e8842e8c
-
+name: SKIA Builds
+on: { push: { tags: ['*'] } }
+defaults:
+  run:
+    shell: bash
+  # working-directory: ${{ github.workspace }}
+#env:
+# version: m106-4100191c58
 jobs:
-  macos:
-    runs-on: macos-10.15
-    strategy:
-      matrix:
-        machine: ["x64", "arm64"]
-        build_type: [Release, Debug]
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v2
-      - run: python3 script/check_release.py --version ${{ env.version }} --build-type ${{ matrix.build_type }} --machine ${{ matrix.machine }}
-        if: ${{ github.event.inputs.skip_release != 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: python3 script/checkout.py --version ${{ env.version }}
-      - run: python3 script/build.py --build-type ${{ matrix.build_type }} --machine ${{ matrix.machine }}
-      - run: python3 script/archive.py --version ${{ env.version }} --build-type ${{ matrix.build_type }} --machine ${{ matrix.machine }}
-      - uses: actions/upload-artifact@v2
-        with:
-          name: Skia-${{ env.version }}-macos-${{ matrix.build_type }}-${{ matrix.machine }}.zip
-          path: '*.zip'
-      - run: python3 script/release.py --version ${{ env.version }} --build-type ${{ matrix.build_type }} --machine ${{ matrix.machine }}
-        if: ${{ github.event.inputs.skip_release != 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  linux:
-    runs-on: ubuntu-16.04
-    strategy:
-      matrix:
-        build_type: [Release, Debug]
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v2
-      - run: sudo ./script/prepare_linux.sh
-      - run: python3 script/check_release.py --version ${{ env.version }} --build-type ${{ matrix.build_type }}
-        if: ${{ github.event.inputs.skip_release != 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: PATH=/usr/lib/binutils-2.26/bin:$PATH python3 script/checkout.py --version ${{ env.version }}
-      - run: PATH=/usr/lib/binutils-2.26/bin:$PATH python3 script/build.py --build-type ${{ matrix.build_type }}
-      - run: PATH=/usr/lib/binutils-2.26/bin:$PATH python3 script/archive.py --version ${{ env.version }} --build-type ${{ matrix.build_type }}
-      - uses: actions/upload-artifact@v2
-        with:
-          name: Skia-${{ env.version }}-linux-${{ matrix.build_type }}-x64.zip
-          path: '*.zip'
-      - run: python3 script/release.py --version ${{ env.version }} --build-type ${{ matrix.build_type }}
-        if: ${{ github.event.inputs.skip_release != 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  linux-gcc4:
-    runs-on: ubuntu-latest
-    container: ubuntu:14.04
-    steps:
-      - uses: actions/checkout@v2
-      - run: sudo ./script/prepare_linux.sh
-      - run: sudo apt-get install binutils-2.26 -y
-      - run: python3 script/check_release.py --version ${{ env.version }} --classifier gcc4
-        if: ${{ github.event.inputs.skip_release != 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: PATH=/usr/lib/binutils-2.26/bin:$PATH python3 script/checkout.py --version ${{ env.version }}
-      - run: PATH=/usr/lib/binutils-2.26/bin:$PATH python3 script/build.py
-      - run: PATH=/usr/lib/binutils-2.26/bin:$PATH python3 script/archive.py --version ${{ env.version }} --classifier gcc4
-      - uses: actions/upload-artifact@v2
-        with:
-          name: Skia-${{ env.version }}-linux-Release-x64-gcc4.zip
-          path: '*.zip'
-      - run: python3 script/release.py --version ${{ env.version }} --classifier gcc4
-        if: ${{ github.event.inputs.skip_release != 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   android:
-    runs-on: ubuntu-16.04
+    if: false # No Android for now
+    name: Android
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
     strategy:
       matrix:
         machine: [arm, arm64, x64, x86]
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-java@v1
+      - name: Set artifact name
+        run: echo "artifact_name=Skia-${{ github.ref_name }}-android-Release-${{ matrix.machine }}" >> "$GITHUB_ENV"
+
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Install Java
+        uses: actions/setup-java@v4
         with:
-          java-version: 1.8
-      - run: sudo ./script/prepare_linux.sh
-      - run: python3 script/check_release.py --version ${{ env.version }} --system android --machine ${{ matrix.machine }}
-        if: ${{ github.event.inputs.skip_release != 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: PATH=/usr/lib/binutils-2.26/bin:$PATH python3 script/checkout.py --version ${{ env.version }} --system android --machine ${{ matrix.machine }}
-      - run: PATH=/usr/lib/binutils-2.26/bin:$PATH python3 script/build.py --system android --machine ${{ matrix.machine }} --ndk "/usr/local/lib/android/sdk/ndk-bundle"
-      - run: PATH=/usr/lib/binutils-2.26/bin:$PATH python3 script/archive.py --system android --machine ${{ matrix.machine }}
-      - uses: actions/upload-artifact@v2
-        with:
-          name: Skia-${{ env.version }}-android-Release-${{ matrix.machine }}.zip
-          path: '*.zip'
-      - run: python3 script/release.py --system android --machine ${{ matrix.machine }}
-        if: ${{ github.event.inputs.skip_release != 'true' }}
+          java-version: '21'
+
+      - name: Install
+        run: sudo ./script/linux_install.sh
+
+      - name: Check release
+        if: false # github.event.inputs.skip_release != 'true'
+        run: |
+          python3 script/check_release.py \
+            --version ${{ github.ref_name }} \
+            --system android \
+            --machine ${{ matrix.machine }} \
+            --repo_slug ${{ github.repository }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  windows:
-    runs-on: windows-2019
-    strategy:
-      matrix:
-        build_type: [Release, Debug]
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v2
-      - shell: bash
-        run: python3 script/check_release.py --version ${{ env.version }} --build-type ${{ matrix.build_type }}
-        if: ${{ github.event.inputs.skip_release != 'true' }}
+      - name: Checkout SKIA
+        run: |
+          python3 script/checkout.py \
+            --version ${{ github.ref_name }} \
+            --system android \
+            --machine ${{ matrix.machine }}
+
+      - name: Build
+        run: |
+          python3 script/build.py \
+            --build-type ${{ matrix.build_type }} \
+            --machine ${{ matrix.machine }} \
+            --system android \
+            --ndk "/usr/local/lib/android/sdk/ndk-bundle"
+
+      - name: Archive
+        run: |
+          python3 script/archive.py \
+            --system android \
+            --machine ${{ matrix.machine }}
+          echo "Creating ${{ env.artifact_name }}.md5"
+        # TODO: MD5 on Android
+
+      - name: Release
+        uses: xresloader/upload-to-github-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: microsoft/setup-msbuild@v1
-      - uses: ilammy/msvc-dev-cmd@v1
-      - shell: bash
-        run: python3 script/checkout.py --version ${{ env.version }}
-      - shell: bash
-        run: python3 script/build.py --build-type ${{ matrix.build_type }}
-      - shell: bash
-        run: python3 script/archive.py --version ${{ env.version }} --build-type ${{ matrix.build_type }}
-      - uses: actions/upload-artifact@v2
         with:
-          name: Skia-${{ env.version }}-windows-${{ matrix.build_type }}-x64.zip
-          path: '*.zip'
-      - shell: bash
-        run: python3 script/release.py --version ${{ env.version }} --build-type ${{ matrix.build_type }}
-        if: ${{ github.event.inputs.skip_release != 'true' }}
+          file: "${{ env.artifact_name }}.zip;${{ env.artifact_name }}.md5"
+          update_latest_release: true # needed to add files like the md5
+          verbose: false
+  linux:
+    # if: false # Disable when fixing other jobs
+    name: Ubuntu Jammy
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { name: "GCC", cc: gcc, cxx: g++ }
+          - { name: "clang", cc: clang, cxx: clang++ }
+        machine:    [x64] #, arm64] # FIXME
+        build_type: [Release, Debug]
+    env:
+      cc:  ${{ matrix.config.cc }}
+      cxx: ${{ matrix.config.cxx }}
+    steps:
+      - name: Set artifact name
+        run: echo "artifact_name=Skia-${{ github.ref_name }}-linux-${{ matrix.build_type }}-${{ matrix.machine }}-${{ matrix.config.cc }}" >> "$GITHUB_ENV"
+
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # ubuntu-20.04 has 3.8, though it worked too
+
+      - name: Install dependencies
+        run: sudo ./script/linux_install.sh
+
+      - name: Check release
+        if: false # github.event.inputs.skip_release != 'true'
+        run: |
+          python3 script/check_release.py \
+            --version ${{ github.ref_name }} \
+            --build-type ${{ matrix.build_type }} \
+            --machine ${{ matrix.machine }} \
+            --classifier ${{ matrix.config.cc }} \
+            --repo_slug ${{ github.repository }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout SKIA
+        run: |
+          python3 script/checkout.py \
+            --version ${{ github.ref_name }} \
+            --machine ${{ matrix.machine }}
+
+      - name: Build
+        run: |
+          python3 script/build.py \
+            --build-type ${{ matrix.build_type }} \
+            --machine ${{ matrix.machine }} \
+            --classifier ${{ matrix.config.cc }}
+
+      - name: Archive
+        run: |
+          python3 script/archive.py \
+            --version ${{ github.ref_name }} \
+            --build-type ${{ matrix.build_type }} \
+            --machine ${{ matrix.machine }} \
+            --classifier ${{ matrix.config.cc }}
+          echo "Creating ${{ env.artifact_name }}.md5"
+          echo $(md5sum ${{ env.artifact_name }}.zip | awk '{ print $1 }') \
+            > ${{ env.artifact_name }}.md5
+
+      - name: Release
+        uses: xresloader/upload-to-github-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          file: "${{ env.artifact_name }}.zip;${{ env.artifact_name }}.md5"
+          update_latest_release: true # needed to add files like the md5
+          verbose: false
+  macos:
+    # if: false # Disable when fixing other jobs
+    name: macOS 12
+    runs-on: macos-12
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        machine:    [x64, arm64]
+        build_type: [Release, Debug]
+    steps:
+      - name: Set artifact name
+        run: echo "artifact_name=Skia-${{ github.ref_name }}-macos-${{ matrix.build_type }}-${{ matrix.machine }}" >> "$GITHUB_ENV"
+
+      - name: Show summary
+        run: |
+          echo "artifact_name: ${{ env.artifact_name }}"
+          echo "BASH_VERSION: $BASH_VERSION"
+          system_profiler SPSoftwareDataType
+          gcc -v
+          xcodebuild -version
+          python --version
+
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install ninja
+
+      - name: Check release
+        if: false # github.event.inputs.skip_release != 'true'
+        run: |
+          python3 script/check_release.py \
+            --version ${{ github.ref_name }} \
+            --build-type ${{ matrix.build_type }} \
+            --machine ${{ matrix.machine }} \
+            --repo_slug ${{ github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout SKIA
+        run: |
+          python3 script/checkout.py \
+            --version ${{ github.ref_name }} \
+            --machine ${{ matrix.machine }}
+
+      - name: Build
+        run: |
+          python3 script/build.py \
+            --build-type ${{ matrix.build_type }} \
+            --machine ${{ matrix.machine }}
+
+      - name: Archive
+        run: |
+          python3 script/archive.py \
+            --version ${{ github.ref_name }} \
+            --build-type ${{ matrix.build_type }} \
+            --machine ${{ matrix.machine }}
+          echo "Creating ${{ env.artifact_name }}.md5"
+          md5 ${{ env.artifact_name }}.zip > ${{ env.artifact_name }}.md5
+
+      - name: Release
+        uses: xresloader/upload-to-github-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          file: "${{ env.artifact_name }}.zip;${{ env.artifact_name }}.md5"
+          update_latest_release: true # needed to add files like the md5
+          verbose: false
+  windows:
+    # if: false # Disable when fixing other jobs
+    name: Windows 2019
+    runs-on: windows-2019
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { name: "MSVC", cc: "cl", cxx: "cl" }
+        # - { name: "clang", cc: "clang", cxx: "clang++" } FIXME
+        build_type: [Release, Debug]
+        machine:    [x64, arm64]
+    env:
+      cc: ${{ matrix.config.cc }}
+      cxx: ${{ matrix.config.cxx }}
+    steps:
+      - name: Set artifact name
+        run: echo "artifact_name=Skia-${{ github.ref_name }}-windows-${{ matrix.build_type }}-${{ matrix.machine }}-${{ matrix.config.cc }}" >> "$GITHUB_ENV"
+
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # windows-2019 has 3.7.9
+
+      - name: Install dependencies
+        run: choco install ninja
+
+      - name: Check release
+        if: github.event.inputs.skip_release != 'true'
+        run: |
+          python3 script/check_release.py \
+            --version ${{ github.ref_name }} \
+            --build-type ${{ matrix.build_type }} \
+            --machine ${{ matrix.machine }} \
+            --classifier ${{ matrix.config.cc }} \
+            --repo_slug ${{ github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout SKIA
+        run: |
+          python3 script/checkout.py \
+            --version ${{ github.ref_name }} \
+            --machine ${{ matrix.machine }}
+
+      - name: Build
+        run: |
+          python3 script/build.py \
+            --build-type ${{ matrix.build_type }} \
+            --machine ${{ matrix.machine }} \
+            --classifier ${{ matrix.config.cc }}
+
+      - name: Archive
+        run: |
+          python3 script/archive.py \
+            --version ${{ github.ref_name }} \
+            --build-type ${{ matrix.build_type }} \
+            --machine ${{ matrix.machine }} \
+            --classifier ${{ matrix.config.cc }}
+          echo "Creating ${{ env.artifact_name }}.md5"
+          certutil -hashfile ${{ env.artifact_name }}.zip MD5 \
+            > ${{ env.artifact_name }}.md5
+
+      - name: Release
+        uses: xresloader/upload-to-github-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          file: "${{ env.artifact_name }}.zip;${{ env.artifact_name }}.md5"
+          update_latest_release: true # needed to add files like the md5
+          verbose: false
