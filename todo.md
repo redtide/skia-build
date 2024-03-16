@@ -11,7 +11,8 @@ Fix if wrong file name and/or files in the list.
 
 ## script/build.py
 
-Check if the original options can be useful and then remove the multiline comment.
+- Add MSVC compiler version to avoid [linker errors](https://github.com/cycfi/elements/issues/382)
+- Check if the original options can be useful and then remove the multiline comment.
 
 ## script/check_release.py
 
